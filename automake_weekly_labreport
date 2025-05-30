@@ -1,0 +1,1108 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul 11 18:10:42 2024
+
+@author: khosravip2
+"""
+
+from matplotlib.ticker import MaxNLocator
+import warnings
+import os
+import pandas as pd
+from datetime import datetime, timedelta
+import jinja2
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
+import numpy as np
+import time
+import subprocess
+from datetime import datetime
+
+# Suppress specific warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
+
+# Function to run your script
+# def run_script():
+#    subprocess.run(["python3", "/Users/khosravip2/OneDrive - National Institutes of Health/ParmisK/03_MEETINGS/SDAN_Weekly/Make_Friday_Agenda.py"])
+
+# Schedule the script
+# schedule.every().day.at("16:30").do(run_script)  # Runs daily at 3:00 PM
+
+# Keep the script running
+# while True:
+#    schedule.run_pending()
+#    time.sleep(1)
+
+# Set Configuation
+datadir = '/Users/khosravip2/Library/CloudStorage/OneDrive-SharedLibraries-NationalInstitutesofHealth/Emotion and Development Branch - Documents'
+#datadir = '/Users/khosravip2/Documents/'
+sheetname = 'Tracker'
+sheetname2 = 'IRTA Subject Count'
+
+
+data = pd.read_excel(os.path.join(
+    datadir, "CumulativeList_FridayAgenda.xlsx"), sheet_name=sheetname)
+
+irtadata = pd.read_excel(os.path.join(
+    datadir, "CumulativeList_FridayAgenda.xlsx"), sheet_name=sheetname2)
+# Convert 'Date' column to datetime
+data['DATE'] = pd.to_datetime(data['DATE'])
+
+# Sort the data by the 'Date' column
+data = data.sort_values(by='DATE')
+
+
+# Created lists for : Subject types, task names, visit types, location of visit, and consent options
+
+subjtype = ["Anxious Kids", "Depressed Kids", "Healthy Kids",
+            "Healthy Adults", "BRAVe Kids", "ASD Kids"]
+
+# taskname = ["Anti-Saccade", "Dwell", "TIM", "Yikes", "Doors", "Scream", "EMA (CTADS)", "New EMA (Anx/Irritability)", "STOP", "Flanker Behavior", "AXCPT", "Memory", "Forms at Home", "Forms at Clinic", "PCDT", "4-Min Speech Sample", "BRAVe (EEG/MEG)", "BRAVe (fMRI)", "Other"]
+
+taskname = [  # "Tx-GCMRT", "Anti-Saccade", "Dwell", "GCMRT-Music", "TIM", "YIKES", "Doors", Scream", "Other",
+    "EMA (CTADS)", "New EMA (Anx/Irritability)", "STOP", "Flanker Behavior", "AXCPT", "Memory", "Forms at Home", "Forms at Clinic", "PCDT", "4-Min Speech Sample",
+    "CRDM", "ratings"]
+
+
+tasknameC = [  # "Tx-GCMRT", "Anti-Saccade", "Dwell", "GCMRT-Music", "TIM", "YIKES", "Doors", "Myelin(T1w/T2w)", "Scream","Dwell Profile Reliability (T1)","Dwell Profile Reliability (T2)",
+    "EMA (CTADS)", "New EMA (Anx/Irritability)", "STOP", "Flanker Behavior", "AXCPT", "Memory", "Forms at Home", "Forms at Clinic", "CRDM", "PCDT", "4-Min Speech Sample", "BRAVe (EEG/MEG)", "BRAVe (fMRI)",
+    "Other", "AXCPT/Flanker4 (fMRI)", "AXCPT/Flanker4 (MEG)", "TAU3.0",
+             "AXCPT/Flanker3 (fMRI) (T1)", "AXCPT/Flanker3 (fMRI) (T2)", "AXCPT/Flanker3 (MEG)", "Movies-Sintel + Francis", "TMS", "Carnival", "ratings", "DECIBELS baseline", "DECIBELS MRI+cTBS", "DECIBELS MEG+cTBS"]
+
+
+visitype = ["V1", "V1", "V2", "Research Only", "Tx", "Tx-GCMRT"]
+
+location = ["Onsite", "Virtual"]
+
+consentopt = ["Opt IN", "Opt OUT"]
+
+
+task_categoriesC = {
+    # "Tx-GCMRT" :"Other",
+    # "Anti-Saccade": "Eyetracking",
+    # "Dwell": "Eyetracking",
+    # "GCMRT-Music": "Eyetracking",
+    # "TIM": "Eyetracking",
+    # "YIKES": "Eyetracking",
+    # "Doors": "Eyetracking",
+    # "Scream": "Pain Tasks",
+    "EMA (CTADS)": "Other",
+    "New EMA (Anx/Irritability)": "Other",
+    "Flanker Behavior": "Other",
+    "AXCPT": "Other",
+    "STOP": "Other",
+    "Memory": "Other",
+    "Forms at Home": "Other",
+    "4-Min Speech Sample": "Other",
+    "Forms at Clinic": "Other",
+    "CRDM": "Other",
+    "Other": "Other",
+    "BRAVe (EEG/MEG)": "BRAVe",
+    "BRAVe (fMRI)": "BRAVe",
+    "AXCPT/Flanker4 (fMRI)": "Scan",
+    "AXCPT/Flanker4 (MEG)": "Scan",
+    "TAU3.0": "Scan",
+    # "Dwell Profile Reliability (T1)": "Scan",
+    # "Dwell Profile Reliability (T2)": "Scan",
+    "AXCPT/Flanker3 (fMRI) (T1)": "Scan",
+    "AXCPT/Flanker3 (fMRI) (T2)": "Scan",
+    "AXCPT/Flanker3 (MEG)": "Scan",
+    "Movies-Sintel + Francis": "Scan",
+    # "Myelin(T1w/T2w)": "Scan",
+    "TMS": "Scan",
+    "ratings": "Other",
+    "Carnival": "Scan",
+    "DECIBELS baseline": "Other",
+    "DECIBELS MRI+cTBS": "Scan",
+    "DECIBELS MEG+cTBS": "Scan"
+}
+
+
+# Define the task categorization
+task_categories = {
+    # "Tx-GCMRT": "Other",
+    "Anti-Saccade": "Eyetracking",
+    "Dwell": "Eyetracking",
+    "GCMRT-Music": "Eyetracking",
+    "TIM": "Eyetracking",
+    "YIKES": "Eyetracking",
+    "Doors": "Eyetracking",
+    "Scream": "Pain Tasks",
+    "EMA (CTADS)": "Other",
+    "New EMA (Anx/Irritability)": "Other",
+    "Flanker Behavior": "Other",
+    "AXCPT": "Other",
+    "STOP": "Other",
+    "Memory": "Other",
+    "Forms at Home": "Other",
+    "CRDM": "Other",
+    "4-Min Speech Sample": "Other",
+    "Forms at Clinic": "Other",
+    "ratings": "Other",
+    # "Other": "Other",
+    "DECIBELS baseline": "Other"
+}
+
+scanbrave_categories = {"BRAVe (EEG/MEG)": "BRAVe",
+                        "BRAVe (fMRI)": "BRAVe",
+                        "AXCPT/Flanker4 (fMRI)": "Scan",
+                        "AXCPT/Flanker4 (MEG)": "Scan",
+                        "TAU3.0": "Scan",
+                        # "Dwell Profile Reliability (T1)": "Scan",
+                        # "Dwell Profile Reliability (T2)": "Scan",
+                        "AXCPT/Flanker3 (fMRI) (T1)": "Scan",
+                        "AXCPT/Flanker3 (fMRI) (T2)": "Scan",
+                        "AXCPT/Flanker3 (MEG)": "Scan",
+                        "Movies-Sintel + Francis": "Scan",
+                        # "Myelin(T1w/T2w)": "Scan",
+                        "TMS": "Scan",
+                        "Carnival": "Scan",
+                        "DECIBELS MRI+cTBS": "Scan",
+                        "DECIBELS MEG+cTBS": "Scan"
+                        }
+
+
+eyetracking_categoriesC = {"Anti-Saccade": "Eyetracking",
+                           "Dwell": "Eyetracking",
+                           "GCMRT-Music": "Eyetracking",
+                           "TIM": "Eyetracking",
+                           "YIKES": "Eyetracking",
+                           "Doors": "Eyetracking"}
+# "Other": "Other"}
+
+scanbrave_task = ["BRAVe (EEG/MEG)", "BRAVe (fMRI)", "AXCPT/Flanker4 (fMRI)", "AXCPT/Flanker4 (MEG)", "TAU3.0",  # "Dwell Profile Reliability (T1)", "Dwell Profile Reliability (T2)",
+                  "AXCPT/Flanker3 (fMRI) (T1)", "AXCPT/Flanker3 (fMRI) (T2)", "AXCPT/Flanker3 (MEG)", "Movies-Sintel + Francis",  "TMS", "Carnival", "DECIBELS MRI+cTBS", "DECIBELS MEG+cTBS"]
+eyetracking_task = ["Anti-Saccade", "Dwell",
+                    "GCMRT-Music", "TIM", "YIKES", "Doors"]  # "Other"
+
+# Define the task categorization
+categories = {"Eyetracking", "Pain Tasks", "Other", "BRAVe", "Scan"}
+
+
+# Count tasks completed for the completed subset in the cumulative list
+cumul_taskscounts = data[['TASK1', 'TASK2', 'TASK3', 'TASK4']].apply(
+    pd.Series.value_counts).sum(axis=1).to_dict()
+
+# Group tasks by their categories (note to IRTAs this creates a multi nested dictionary)
+categorized_tasksC = defaultdict(list)
+for task, count in cumul_taskscounts.items():
+    # Default to "Other" if task is not found in the dictionary
+    category = task_categoriesC.get(task, "Other")
+    categorized_tasksC[category].append((task, count))
+
+
+# Group tasks by their categories (note to IRTAs this creates a multi nested dictionary)
+categorized_tasks = defaultdict(list)
+for task, count in cumul_taskscounts.items():
+    # Default to "Other" if task is not found in the dictionary
+    category = task_categories.get(task, "Other")
+    categorized_tasks[category].append((task, count))
+
+# Define the date range for the report (from previous Friday to current Thursday)
+
+today = datetime.now()  # Get the current date and time
+today = pd.to_datetime(today)
+today_weekday = today.weekday()
+
+lastweek = today - timedelta(days=(today_weekday - 4) % 7 + 1)
+last_friday = today - timedelta(days=(today_weekday - 4) % 7)
+recent_thursday = today - timedelta(days=(today_weekday - 3) % 7 + 1)
+last_thursday = recent_thursday - timedelta(days=7-1)
+last_thursdaya = recent_thursday - timedelta(days=7)
+last_friday2 = last_friday - timedelta(days=7)
+last_friday2a = last_friday - timedelta(days=7+1)
+last_thursday2 = last_thursday - timedelta(days=7-1)
+last_friday3 = last_friday2 - timedelta(days=7)
+last_friday3a = last_friday2a - timedelta(days=7)
+last_thursday3 = last_thursday2 - timedelta(days=7)
+last_friday4 = last_friday3 - timedelta(days=7)
+last_friday4a = last_friday3a - timedelta(days=7)
+last_thursday4 = last_thursday3 - timedelta(days=7)
+last_friday5 = last_friday4 - timedelta(days=7)
+last_friday5a = last_friday4a - timedelta(days=7)
+last_thursday5 = last_thursday4 - timedelta(days=7)
+
+########################################################
+################ REPORTS FOR THIS WEEK #################
+########################################################
+
+# Filter the data for the weekly date range
+weeklydata = data[(data['DATE'] >= lastweek) & (data['DATE'] <= today)]
+
+
+# Filter the data for the weekly date range
+current_week_data = data[(data['DATE'] >= last_friday)
+                         & (data['DATE'] <= today)]
+
+previous_week_data = data[(data['DATE'] >= last_friday2a) & (
+    data['DATE'] <= last_thursday)]
+
+previous_2week_data = data[(data['DATE'] >= last_friday3a) & (
+    data['DATE'] <= last_thursday2)]
+
+previous_3week_data = data[(data['DATE'] >= last_friday4a) & (
+    data['DATE'] <= last_thursday3)]
+
+previous_4week_data = data[(data['DATE'] >= last_friday5a) & (
+    data['DATE'] <= last_thursday4)]
+
+
+current_week_cmpltdata = current_week_data[current_week_data['SESSIONSTATUS'] == 'Completed']
+previous_week_cmpltdata = previous_week_data[previous_week_data['SESSIONSTATUS'] == 'Completed']
+previous_2week_cmpltdata = previous_2week_data[previous_2week_data['SESSIONSTATUS'] == 'Completed']
+previous_3week_cmpltdata = previous_3week_data[previous_3week_data['SESSIONSTATUS'] == 'Completed']
+previous_4week_cmpltdata = previous_4week_data[previous_4week_data['SESSIONSTATUS'] == 'Completed']
+
+# Calculate the total number of sessions for this week and the previous week
+total_sessions_this_week = len(current_week_cmpltdata)
+total_sessions_previous_week = len(previous_week_cmpltdata)
+total_sessions_previous_2week = len(previous_2week_cmpltdata)
+total_sessions_previous_3week = len(previous_3week_cmpltdata)
+total_sessions_previous_4week = len(previous_4week_cmpltdata)
+
+completed_data = weeklydata[weeklydata['SESSIONSTATUS'] == 'Completed']
+canceled_data = weeklydata[weeklydata['SESSIONSTATUS'] == 'Canceled']
+unknown_data = weeklydata[weeklydata['SESSIONSTATUS'].isna()]
+
+
+# Count tasks completed for the completed subset
+tasks_completed_counts = completed_data[['TASK1', 'TASK2', 'TASK3', 'TASK4']].apply(
+    pd.Series.value_counts).sum(axis=1).to_dict()
+
+
+# Group the tasks by their categories
+categorized_tasks_wk = defaultdict(list)
+for task, count in tasks_completed_counts.items():
+    # Default to "Other" if task is not found in the dictionary
+    category = task_categories.get(task, "Other")
+    categorized_tasks[category].append((task, count))
+
+
+# Create a DataFrame to map tasks to categories
+task_category_df = pd.DataFrame(
+    list(task_categories.items()), columns=['Task', 'Category'])
+
+# Melt the completed data to consolidate tasks into one column
+melted_completed_data = completed_data.melt(
+    id_vars=['SUBJECTTYPE'],
+    value_vars=['TASK1', 'TASK2', 'TASK3', 'TASK4'],
+    var_name='TaskNumber',
+    value_name='Task'
+)
+
+# Merge with task category data
+melted_completed_data = melted_completed_data.merge(
+    task_category_df, on='Task', how='left')
+
+# Pivot the completed data to get table structure
+cmpltvisit_pivot_table = completed_data.pivot_table(
+    index='SUBJECTTYPE', columns='VISITTYPE', aggfunc='size', fill_value=0)
+
+# Reindex to ensure all subject types are included
+cmpltvisit_pivot_table = cmpltvisit_pivot_table.reindex(subjtype, fill_value=0)
+
+# Add totals to the pivot table
+cmpltvisit_pivot_table['Total'] = cmpltvisit_pivot_table.sum(axis=1)
+cmpltvisit_pivot_table.loc['Total'] = cmpltvisit_pivot_table.sum(axis=0)
+
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+cmpltvisit_pivot_dict = cmpltvisit_pivot_table.to_dict(orient='index')
+
+# Pivot the consolidated data to get the desired table structure
+cmplttask_pivot_table = melted_completed_data.pivot_table(
+    index='Category', columns='Task', aggfunc='size', fill_value=0)
+
+# Reindex to ensure all categories are included
+cmplttask_pivot_table = cmplttask_pivot_table.reindex(categories, fill_value=0)
+
+# Transpose the pivot table to have tasks as index to reindex all the tasknames
+T_cmplttask_pivot_table = cmplttask_pivot_table.T
+# Reindex to ensure all subject types are included
+cmplttask_pivot_table = T_cmplttask_pivot_table.reindex(taskname, fill_value=0)
+
+# Add totals to the pivot table
+cmplttask_pivot_table['Total'] = cmplttask_pivot_table.sum(axis=1)
+cmplttask_pivot_table.loc['Total'] = cmplttask_pivot_table.sum(axis=0)
+
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+cmplttask_pivot_dict = cmplttask_pivot_table.to_dict(orient='index')
+
+# Pivot the canceled data to get table structure
+cncl_pivot_table = canceled_data.pivot_table(
+    index='SUBJECTTYPE', columns='VISITTYPE', aggfunc='size', fill_value=0)
+
+# Reindex to include all subject types even if 0 counts for this week
+cncl_pivot_table = cncl_pivot_table.reindex(subjtype, fill_value=0)
+
+# Add totals to the pivot table
+cncl_pivot_table['Total'] = cncl_pivot_table.sum(axis=1)
+cncl_pivot_table.loc['Total'] = cncl_pivot_table.sum(axis=0)
+
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+cncl_pivot_dict = cncl_pivot_table.to_dict(orient='index')
+
+######################################################
+###### CUMULATIVE REPORT SINCE 05.31.2024 ######
+######################################################
+completed_dataC = data[data['SESSIONSTATUS'] == 'Completed']
+canceled_dataC = data[data['SESSIONSTATUS'] == 'Canceled']
+unknown_dataC = data[data['SESSIONSTATUS'].isna()]
+
+
+consentmovieC_pivot_table = irtadata.pivot_table(
+    index='SUBJECTTYPE', columns="CONSENTMOVIES", aggfunc='size', fill_value=0)
+consentmovieC_pivot_table = consentmovieC_pivot_table.reindex(
+    subjtype, fill_value=0)
+
+consentmovieC_pivot_table.loc['Total'] = consentmovieC_pivot_table.sum(axis=0)
+
+consentmovieC_pivot_dict = consentmovieC_pivot_table.to_dict(orient='index')
+
+consenttimC_pivot_table = irtadata.pivot_table(
+    index='SUBJECTTYPE', columns="CONSENTTIM", aggfunc='size', fill_value=0)
+
+consenttimC_pivot_table = consenttimC_pivot_table.reindex(
+    subjtype, fill_value=0)
+
+T_consenttimC_pivot_table = consenttimC_pivot_table.T
+consenttimC_pivot_table = T_consenttimC_pivot_table.reindex(
+    consentopt, fill_value=0)
+
+consenttimC_pivot_table = consenttimC_pivot_table.T
+consenttimC_pivot_table.loc['Total'] = consenttimC_pivot_table.sum(axis=0)
+
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+consenttimC_pivot_dict = consenttimC_pivot_table.to_dict(orient='index')
+
+# Pivot the completed data to get table structure
+cmpltvisitC_pivot_table = completed_dataC.pivot_table(
+    index='SUBJECTTYPE', columns='VISITTYPE', aggfunc='size', fill_value=0)
+
+# Reindex to ensure all subject types are included
+cmpltvisitC_pivot_table = cmpltvisitC_pivot_table.reindex(
+    subjtype, fill_value=0)
+
+# Add totals to the pivot table
+cmpltvisitC_pivot_table['Total'] = cmpltvisitC_pivot_table.sum(axis=1)
+
+cmpltvisitC_pivot_table.loc['Total'] = cmpltvisitC_pivot_table.sum(axis=0)
+
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+cmpltvisitC_pivot_dict = cmpltvisitC_pivot_table.to_dict(orient='index')
+
+# Create a DataFrame to map tasks to categories
+task_category_dfC = pd.DataFrame(
+    list(task_categories.items()), columns=['Task', 'Category'])
+
+# Melt the completed data to consolidate tasks into one column
+melted_completed_dataC = completed_dataC.melt(
+    id_vars=['SUBJECTTYPE'],
+    value_vars=['TASK1', 'TASK2', 'TASK3', 'TASK4'],
+    var_name='TaskNumber',
+    value_name='Task'
+)
+
+# Merge with task category data
+melted_completed_dataC = melted_completed_dataC.merge(
+    task_category_dfC, on='Task', how='left')
+
+# Pivot the consolidated data to get the desired table structure
+cmplttaskC_pivot_table = melted_completed_dataC.pivot_table(
+    index='Task', columns='SUBJECTTYPE', aggfunc='size', fill_value=0
+)
+
+# Reindex to ensure all subject types are included
+cmplttaskC_pivot_table = cmplttaskC_pivot_table.reindex(taskname, fill_value=0)
+
+T_cmplttaskC_pivot_table = cmplttaskC_pivot_table.T
+
+# Reindex to ensure all subject types are included
+cmplttaskC_pivot_table = T_cmplttaskC_pivot_table.reindex(
+    subjtype, fill_value=0)
+
+
+# Add totals to the pivot table
+cmplttaskC_pivot_table['Total'] = cmplttaskC_pivot_table.sum(axis=1)
+cmplttaskC_pivot_table.loc['Total'] = cmplttaskC_pivot_table.sum(axis=0)
+
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+cmplttaskC_pivot_dict = cmplttaskC_pivot_table.to_dict(orient='index')
+
+# Create a DataFrame to map tasks to categories
+scanbrave_dfC = pd.DataFrame(
+    list(scanbrave_categories.items()), columns=['Task', 'Category'])
+
+
+eyetracking_dfC = pd.DataFrame(
+    list(eyetracking_categoriesC.items()), columns=['Task', 'Category'])
+
+# Merge with task category data
+scanbrave_melted_completed_dataC = melted_completed_dataC.merge(
+    scanbrave_dfC, on='Task', how='left')
+
+eyetracking_melted_completed_dataC = melted_completed_dataC.merge(
+    eyetracking_dfC, on='Task', how='left')
+
+scan_brave_pivot_tableC = scanbrave_melted_completed_dataC.pivot_table(
+    index='Task', columns='SUBJECTTYPE', aggfunc='size', fill_value=0
+)
+
+eyetracking_pivot_tableC = eyetracking_melted_completed_dataC.pivot_table(
+    index='Task', columns='SUBJECTTYPE', aggfunc='size', fill_value=0
+)
+
+scanbrave_cat = ["BRAVe", "Scan"]
+# Reindex to ensure all task types are included
+scan_brave_pivot_tableC = scan_brave_pivot_tableC.reindex(
+    scanbrave_task, fill_value=0)
+T_scan_brave_pivot_tableC = scan_brave_pivot_tableC.T
+scan_brave_pivot_tableC = T_scan_brave_pivot_tableC.reindex(
+    subjtype, fill_value=0)
+scan_brave_pivot_tableC = scan_brave_pivot_tableC.T
+# Add totals to the pivot table
+scan_brave_pivot_tableC['Total'] = scan_brave_pivot_tableC.sum(axis=1)
+scan_brave_pivot_tableC.loc['Total'] = scan_brave_pivot_tableC.sum(axis=0)
+scan_brave_pivot_tableC = scan_brave_pivot_tableC.T
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+scan_brave_pivot_dictC = scan_brave_pivot_tableC.to_dict(orient='index')
+
+
+eyetracking_cat = ["Eyetracking"]
+eyetracking_pivot_tableC = eyetracking_pivot_tableC.reindex(
+    eyetracking_task, fill_value=0)
+
+T_eyetracking_pivot_tableC = eyetracking_pivot_tableC.T
+eyetracking_pivot_tableC = T_eyetracking_pivot_tableC.reindex(
+    subjtype, fill_value=0)
+eyetracking_pivot_tableC = eyetracking_pivot_tableC.T
+# Add totals to the pivot table
+eyetracking_pivot_tableC['Total'] = eyetracking_pivot_tableC.sum(axis=1)
+eyetracking_pivot_tableC.loc['Total'] = eyetracking_pivot_tableC.sum(axis=0)
+eyetracking_pivot_tableC = eyetracking_pivot_tableC.T
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+eyetracking_pivot_dictC = eyetracking_pivot_tableC.to_dict(orient='index')
+
+
+# Create a mapping of Scan and BRAVe categories to their corresponding tasks for the header
+scan_brave_task_mapC = defaultdict(list)
+for task, category in scanbrave_categories.items():
+    if category in ['Scan', 'BRAVe']:
+        scan_brave_task_mapC[category].append(task)
+
+
+# Create a mapping of Scan and BRAVe categories to their corresponding tasks for the header
+eyetracking_task_mapC = defaultdict(list)
+for task, category in eyetracking_categoriesC.items():
+    if category in ['Eyetracking']:
+        eyetracking_task_mapC[category].append(task)
+
+
+# Analysis for the second sheet (Sheet2)
+active_data = irtadata[irtadata['STATUS'] == 'Active']
+post_phone_data = irtadata[irtadata['STATUS'] == 'Post-Phone Screen']
+pre_enrollment_data = irtadata[irtadata['STATUS'] == 'pre-enrollment']
+paused_data = irtadata[irtadata['STATUS'] == 'Paused']
+# for internal purposes do not include in html list
+inactive_data = irtadata[irtadata['STATUS'] == "Inactive"]
+
+# Create pivot tables for each status
+active_counts = active_data.groupby(
+    ['IRTA', 'SUBJECTTYPE']).size().unstack(fill_value=0)
+post_phone_counts = post_phone_data.groupby(['IRTA']).size()
+pre_enrollment_counts = pre_enrollment_data.groupby(['IRTA']).size()
+paused_counts = paused_data.groupby(['IRTA']).size()
+inactive_counts = inactive_data.groupby(['IRTA']).size()
+
+# Combine the pivot tables into a single DataFrame for rendering
+irta_counts = pd.DataFrame({
+    'Active': active_counts.sum(axis=1),
+    'Post-Phone Screen': post_phone_counts,
+    'Pre-enrollment': pre_enrollment_counts,
+    'Paused': paused_counts,
+    'Inactive': inactive_counts
+}).fillna(0).astype(int)
+
+# Merge active_counts with irta_counts
+merged_counts = active_counts.join(
+    irta_counts, how='outer').fillna(0).astype(int)
+merged_counts['Total'] = active_counts.sum(axis=0)
+merged_counts['Total'] = active_counts.sum(axis=1)
+# Convert the combined counts to a dictionary for rendering
+merged_counts_dict = merged_counts.to_dict(orient='index')
+
+
+# Create a mapping of categories to their corresponding tasks for the header
+category_task_map = defaultdict(list)
+for task, category in task_categories.items():
+    category_task_map[category].append(task)
+
+
+# Create a DataFrame to map tasks to categories
+scanbrave_df = pd.DataFrame(
+    list(scanbrave_categories.items()), columns=['Task', 'Category'])
+
+eyetracking_df = pd.DataFrame(
+    list(eyetracking_categoriesC.items()), columns=['Task', 'Category'])
+
+# Merge with task category data
+scanbrave_melted_completed_data = melted_completed_data.merge(
+    scanbrave_df, on='Task', how='left')
+
+eyetracking_melted_completed_data = melted_completed_data.merge(
+    eyetracking_df, on='Task', how='left')
+
+
+
+scan_brave_pivot_table = scanbrave_melted_completed_data.pivot_table(
+    index='Task', columns='Category_y', aggfunc='size', fill_value=0
+)
+
+eyetracking_pivot_table = eyetracking_melted_completed_data.pivot_table(
+    index='Task', columns='Category_y', aggfunc='size', fill_value=0)
+
+
+scanbrave_cat = ["BRAVe", "Scan"]
+# Reindex to ensure all task types are included
+scan_brave_pivot_table = scan_brave_pivot_table.reindex(
+    scanbrave_task, fill_value=0)
+
+T_scan_brave_pivot_table = scan_brave_pivot_table.T
+
+
+scan_brave_pivot_table = T_scan_brave_pivot_table.reindex(
+    scanbrave_cat, fill_value=0)
+
+scan_brave_pivot_table = scan_brave_pivot_table.T
+
+
+# Add totals to the pivot table
+scan_brave_pivot_table['Total'] = scan_brave_pivot_table.sum(axis=1)
+scan_brave_pivot_table.loc['Total'] = scan_brave_pivot_table.sum(axis=0)
+scan_brave_pivot_table = scan_brave_pivot_table.T
+
+
+# Convert the pivot table to a dictionary for easier rendering in Jinja2
+scan_brave_pivot_dict = scan_brave_pivot_table.to_dict(orient='index')
+
+eyetracking_pivot_dict = eyetracking_pivot_table.to_dict(orient='index')
+
+# Create a mapping of Scan and BRAVe categories to their corresponding tasks for the header
+scan_brave_task_map = defaultdict(list)
+for task, category in scanbrave_categories.items():
+    if category in ['Scan', 'BRAVe']:
+        scan_brave_task_map[category].append(task)
+
+
+eyetracking_task_map = defaultdict(list)
+for task, category in eyetracking_categoriesC.items():
+    if category in ['Scan', 'BRAVe']:
+        eyetracking_task_map[category].append(task)
+
+
+# Filter for completed sessions
+completed_data = data[data['SESSIONSTATUS'] == 'Completed']
+# Make an explicit copy to avoid warnings
+completed_data = completed_dataC.copy()
+completed_data.loc[:, 'MONTH'] = pd.to_datetime(
+    completed_dataC['DATE']).dt.month
+completed_data.loc[:, 'YEAR'] = pd.to_datetime(completed_dataC['DATE']).dt.year
+completed_data.loc[:, 'WEEK'] = pd.to_datetime(
+    completed_dataC['DATE']).dt.isocalendar().week
+
+
+# Group by month and count the number of completed sessions for 2024
+monthly_counts_2024 = completed_data[completed_data['YEAR'] == 2024].groupby(
+    'MONTH').size()
+monthly_counts_2025 = completed_data[completed_data['YEAR'] == 2025].groupby(
+    'MONTH').size()
+
+# Filter for completed sessions and make a copy
+completed_data = data[data['SESSIONSTATUS'] == 'Completed'].copy()
+
+# Ensure DATE column is in datetime format
+completed_data['DATE'] = pd.to_datetime(completed_data['DATE'])
+
+# Extract month, year, and week 
+completed_data.loc[:, 'MONTH'] = completed_data['DATE'].dt.month
+completed_data.loc[:, 'YEAR'] = completed_data['DATE'].dt.year
+completed_data.loc[:, 'WEEK'] = completed_data['DATE'].dt.isocalendar().week
+
+# Group by month and count the number of completed sessions for 2024
+monthly_counts_2024 = completed_data[completed_data['YEAR'] == 2024].groupby(
+    'MONTH').size()
+
+# Extract counts for each month from June to December
+total_mon6 = monthly_counts_2024.loc[6]
+total_mon7 = monthly_counts_2024.loc[7]
+total_mon8 = monthly_counts_2024.loc[8]
+total_mon9 = monthly_counts_2024.loc[9]
+total_mon10 = monthly_counts_2024.loc[10]
+total_mon11 = monthly_counts_2024.loc[11]
+total_mon12 = monthly_counts_2024.loc[12]
+total_mon1 = monthly_counts_2025.loc[1]
+total_mon2 = monthly_counts_2025.loc[2]
+total_mon3 = monthly_counts_2025.loc[3]
+total_mon4 = monthly_counts_2025.loc[4]
+
+
+# Weekly counts for 2025
+weekly_counts_2025 = completed_data[completed_data['YEAR'] == 2025].groupby(
+    'WEEK').size()
+
+# Ensure all weeks of 2025 are included even if the count is 0
+all_weeks = pd.DataFrame({'WEEK': range(1, 53)})
+
+
+# Convert Series to DataFrame and give it a name
+weekly_counts_2025 = weekly_counts_2025.reset_index(name='COUNT')
+
+# Merge with all weeks to ensure all weeks are included
+weekly_counts_2025 = all_weeks.merge(
+    weekly_counts_2025, on='WEEK', how='left').fillna(0)
+weekly_counts_2025['COUNT'] = weekly_counts_2025['COUNT'].astype(int)
+
+# Extract weekly counts for 2025
+weekly_counts_list = weekly_counts_2025['COUNT'].tolist()
+
+
+# Define custom date ranges for each week
+date_ranges = [
+    ('05/02', '05/08'),
+    ('05/09', '05/15'),
+    ('05/16', '05/22'),
+    ('05/23', '05/29')
+]
+
+# Create week labels
+week_labels = [f"{start}–{end}" for start, end in date_ranges]
+print("Week Labels:", week_labels)
+# Convert DATE column to datetime if not already
+data['DATE'] = pd.to_datetime(data['DATE'])
+
+# Initialize list to store weekly counts
+weekly_data_list = []
+
+# Loop through each date range and count completed sessions
+for start, end in date_ranges:
+    # Convert start and end to datetime
+    start_date = datetime.strptime(f"2025-{start}", "%Y-%m/%d")
+    end_date = datetime.strptime(f"2025-{end}", "%Y-%m/%d")
+
+    # Filter data for the current date range
+    weekly_data = data[(data['DATE'] >= start_date)
+                       & (data['DATE'] <= end_date)]
+    weekly_data_cmplt = weekly_data[weekly_data['SESSIONSTATUS']
+                                    == 'Completed']
+
+    # Store the count of completed sessions
+    weekly_data_list.append(len(weekly_data_cmplt))
+
+print("Weekly Counts:", weekly_data_list)
+
+
+def create_custom_week_plot(week_labels, weekly_data_list,
+                            total_mon6, total_mon7, total_mon8,
+
+                            total_mon9, total_mon10, total_mon11, total_mon12, total_mon1):
+
+    # Define labels for months and add weekly labels
+    months = ['June 24', 'July 24', 'Aug. 24', 'Sept. 24', 'Oct. 24',
+              'Nov. 24', 'Dec. 24', 'Jan. 25', 'Feb. 25', 'Mar. 25', 'Apr. 25']
+    labels = months + week_labels
+
+    # Combine sessions for months and weeks
+    sessions = [total_mon6, total_mon7, total_mon8, total_mon9, total_mon10, total_mon11,
+                total_mon12, total_mon1, total_mon2, total_mon3, total_mon4] + weekly_data_list
+
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(14, 3.5))
+    ax.plot(labels, sessions, marker='o',
+            color='cadetblue', label='Completed Sessions')
+    ax.set_ylabel('Total Completed Sessions')
+    ax.set_title('Total Completed Sessions Over Time')
+    ax.set_yticks(range(0, max(sessions) + 15, 15)
+                  if max(sessions) > 0 else [0])
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=45, ha='center')
+
+ # === ADD VERTICAL LINE === #
+
+    # Adjust the x-axis limits to provide padding
+    ax.set_xlim(-0.5, 14.5)  # Adjusted to fit the number of weeks
+    # Adjust the x-axis limits to provide padding
+   # ax.set_xlim(-0.5, len(labels) - 0.5)
+    # plt.grid(True, linestyle='--', alpha=0.5)
+    # plt.legend()
+    # === ADD LABEL === #
+    # === ADD VERTICAL LINE === #
+    # Position where monthly ends and weekly starts
+    transition_index = len(months) - 0.5
+    ax.axvline(x=transition_index, color='gray',
+               linestyle='--', alpha=0.7, label='Weekly Data')
+
+    # transition_index = len(months) - 0.5  # Position where monthly ends and weekly starts
+    # ax.axvline(x=transition_index, color='gray', linestyle='--', alpha=0.7, label='Active Month Weekly Data')
+    # === ADD LABEL === #
+    ax.text(transition_index + 0.5, max(sessions), 'Weekly Data',
+            color='black', va='bottom', ha='center')
+
+    # ax.text(transition_index + 0.5, max(sessions), 'Active Month Weekly Data',
+    #       color='gray', rotation=90, va='bottom', ha='center')
+    plt.tight_layout()
+
+    # Save the plot to a BytesIO object
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    buf.seek(0)
+
+    # Encode the image to base64
+    plot_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    return plot_base64
+
+
+combined_plot_base64 = create_custom_week_plot(
+    week_labels, weekly_data_list,
+    total_mon6, total_mon7, total_mon8, total_mon9, total_mon10, total_mon11, total_mon12, total_mon1
+)
+
+# Define the template for the HTML report
+html_template = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Friday_Agenda_{{today}}</title>
+    <style>
+        body { font-family: Aptos, sans-serif; }
+        table { width: 70%; hight: 40%;  border-collapse: collapse; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .spaced { margin-top: 20px; }
+    </style>
+</head>
+<body>
+   <style>
+       @media print {
+           .page-break { page-break-before: always; }
+       }
+   </style>
+    <div class="Header">Page 1</div>
+    <h2>WEEKLY REPORT</h2>
+    
+    <!-- Your first section content here -->
+
+
+
+    <p>Date Range: {{ last_friday }} to {{ today }}</p>
+    
+
+    <h3 style="margin-top: 20px;"></h3>
+   <p><img src="data:image/png;base64,{{ combined_plot_base64 }}" alt="Sessions Comparison Plot"></p>
+
+    <h3><i>Completed Visits</i></h3>
+    <table>
+        <tr>
+            <th></th>
+            {% for visittype in cmpltvisit_pivot_table.columns %}
+                <th>{{ visittype }}</th>
+            {% endfor %}
+        </tr>
+        {% for SUBJECTTYPE, visits in cmpltvisit_pivot_dict.items() %}
+        <tr>
+            <td>{{ SUBJECTTYPE }}</td>
+            {% for visittype in cmpltvisit_pivot_table.columns %}
+            <!-- Wrap the total column values in bold tags -->
+            {% if visittype == 'Total' %}
+            <td><b>{{ visits.get(visittype, 0) }}</b></td>
+            {% else %}
+            <td>{{ visits.get(visittype, 0) }}</td>
+            {% endif %}
+                
+        {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h3><i>Canceled Visits</i></h3>
+    <table>
+        <tr><
+
+            <th></th>
+            {% for visittype in cncl_pivot_table.columns %}
+                <th>{{ visittype}}</th>
+            {% endfor %}
+        </tr>
+        {% for SUBJECTTYPE, visits in cncl_pivot_dict.items() %}
+        <tr>
+            <td>{{ SUBJECTTYPE }}</td>
+            {% for visittype in cncl_pivot_table.columns %}
+            {% if visittype == 'Total' %}
+            <td><b>{{ visits.get(visittype, 0)|int }}</b></td>
+            {% else %}
+            <td>{{ visits.get(visittype, 0)|int }}</td>
+            {% endif %}
+        {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h3><i>Completed Tasks</i></h3>
+    <table>
+        <thead>
+            <tr>
+                {% for category, tasks in category_task_map.items() %}
+                    <th colspan="{{ tasks|length }}">{{ category }}</th>
+                {% endfor %}
+                <th>Total</th>
+            </tr>
+            <tr>
+                {% for category, tasks in category_task_map.items() %}
+                    {% for task in tasks %}
+                        <th>{{ task }}</th>
+                    {% endfor %}
+                {% endfor %}
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                {% for category, tasks in category_task_map.items() %}
+                    {% for task in tasks %}
+                        <td>{{ cmplttask_pivot_dict.get(task, {}).get('Total', 0) }}</td>
+                    {% endfor %}
+                {% endfor %}
+                <td><b>{{ cmplttask_pivot_table.loc['Total', 'Total'] }}</b></td>
+            </tr>
+        </tbody>
+    </table>
+
+   <table>
+       <thead>
+           <tr>
+               {% for category, tasks in scan_brave_task_map.items() %}
+                   <th colspan="{{ tasks|length }}">{{ category }}</th>
+               {% endfor %}
+               <th>Total</th>
+           </tr>
+           <tr>
+               {% for category, tasks in scan_brave_task_map.items() %}
+                   {% for task in tasks %}
+                       <th>{{ task }}</th>
+                   {% endfor %}
+               {% endfor %}
+               <th></th>
+           </tr>
+       </thead>
+       <tbody>
+           <tr>
+               {% for category, tasks in scan_brave_task_map.items() %}
+                   {% for task in tasks %}
+                      <td>{{ scan_brave_pivot_dict.get(category, {}).get(task, 0) }}</td>
+                  {% endfor %}  
+            {% endfor %}
+                  {% for task in tasks %}
+                      <td>{{ scan_brave_pivot_dict.get(task, {}).get('Total', 0) }}</td>
+            {% endfor %}
+
+               <td><b>{{ scan_brave_pivot_table.loc['Total', 'Total'] }}</b></td>
+         </tr>
+       </tbody>
+   </table>
+    <h2>IRTA SUBJECT TOTALS:</h2>
+    <table>
+        <tr>
+            <th>IRTA</th>
+            {% for subjecttype in active_counts.columns %}
+                <th>{{ subjecttype }}</th>
+            {% endfor %}
+            <th>Total</th>
+            
+        </tr>
+        {% for IRTA, counts in merged_counts_dict.items() %}
+        <tr>
+            <td>{{ IRTA }}</td>
+            {% for subjecttype in active_counts.columns %}
+                <td>{{ counts.get(subjecttype, 0) }}</td>
+            {% endfor %}
+            <!-- Bold the Total column value -->
+            <td><b>{{ counts.get('Active', 0) }}</b></td>
+        </tr>
+        {% endfor %}
+    </table>
+   <p> </p>
+<body>
+<body>
+
+
+<div class="page-break"></div>
+<div class="Header">Page 2</div>
+<h2>CUMULATIVE REPORT SINCE 05.31.2024</h2>
+
+<!-- Cumulative report content here -->
+
+
+
+
+   <h3> </h3>
+    <h3><i>Consented Movies</i></h3>
+    <table>
+        <tr>
+            <th></th>
+            {% for opt in consentmovieC_pivot_table.columns %}
+                <th>{{ opt }}</th>
+            {% endfor %}
+        </tr>
+        {% for SUBJECTTYPE, counts in consentmovieC_pivot_dict.items() %}
+        <tr>
+            <td>{{ SUBJECTTYPE }}</td>
+            {% for opt in consentmovieC_pivot_table.columns %}
+                <td>{{ counts.get(opt, 0) }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h3><i>Consented TIM</i></h3>
+    <table>
+        <tr>
+            <th></th>
+            {% for opt in consenttimC_pivot_table.columns %}
+                <th>{{ opt }}</th>
+            {% endfor %}
+        </tr>
+        {% for SUBJECTTYPE, counts in consenttimC_pivot_dict.items() %}
+        <tr>
+            <td>{{ SUBJECTTYPE }}</td>
+            {% for opt in consenttimC_pivot_table.columns %}
+                <td>{{ counts.get(opt, 0) }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h3>Completed Tasks</h3>
+    <table>
+        <tr>
+            <th></th>
+            {% for Task in cmplttaskC_pivot_table.columns %}
+                <th>{{ Task }}</th>
+            {% endfor %}
+        </tr>
+        {% for SUBJECTTYPE, Task in cmplttaskC_pivot_dict.items() %}
+        <tr>
+            <td>{{ SUBJECTTYPE }}</td>
+            {% for tasknameC in cmplttaskC_pivot_table.columns %}
+                <!-- Check if the column is 'Total' to bold the value -->
+                {% if tasknameC == 'Total' %}
+                <td><b>{{ Task.get(tasknameC, 0) }}</b></td>
+            {% else %}
+                <td>{{ Task.get(tasknameC, 0) }}</td>
+            {% endif %}
+        {% endfor %}
+    </tr>    
+    {% endfor %}
+</table>
+     
+     <h3><i></i></h3>
+     <tr>
+     </tr>
+     
+     <h3><i></i></h3>
+     <table>
+         <tr>
+             <th></th>
+             {% for Task in scan_brave_pivot_tableC.columns %}
+                 <th>{{ Task }}</th>
+             {% endfor %}
+         </tr>
+         {% for SUBJECTTYPE, Task in scan_brave_pivot_dictC.items() %}
+         <tr>
+             <td>{{ SUBJECTTYPE }}</td>
+             {% for scanbrave_task in scan_brave_pivot_tableC.columns %}
+                 <!-- Bold the Total column value -->
+                 {% if scanbrave_task == 'Total' %}
+                <td><b>{{ Task.get(scanbrave_task, 0) }}</b></td>
+            {% else %}
+                <td>{{ Task.get(scanbrave_task, 0) }}</td>
+            {% endif %}
+        {% endfor %}
+    </tr>
+    {% endfor %}
+</table>
+
+
+
+   <h3><i></i></h3>
+   <table>
+       <tr>
+       <th></th>
+       {% for Task in eyetracking_pivot_tableC.columns %}
+                 <th>{{ Task }}</th>
+             {% endfor %}
+         </tr>
+         {% for SUBJECTTYPE, Task in eyetracking_pivot_dictC.items() %}
+         <tr>
+             <td>{{ SUBJECTTYPE }}</td>
+             {% for eyetracking_task in eyetracking_pivot_tableC.columns %}
+                 <!-- Bold the Total column value -->
+                 {% if eyetracking_task == 'Total' %}
+                <td><b>{{ Task.get(eyetracking_task, 0) }}</b></td>
+            {% else %}
+                <td>{{ Task.get(eyetracking_task, 0) }}</td>
+            {% endif %}
+        {% endfor %}
+    </tr>
+    {% endfor %}
+</table>
+</body>
+<p> </p>
+<p> </p>
+<body>
+<div class="Footer" style="font-size: 15px; padding: 8x 0;">
+    <i>Report Generated By P.Khosravi</i>
+</div>
+</body>
+</html>
+"""
+
+
+# Render the HTML report
+template = jinja2.Template(html_template)
+html_report = template.render(
+    last_friday=last_friday.strftime('%m-%d-%Y'),
+    today=today.strftime('%m-%d-%Y'),
+    cmpltvisit_pivot_table=cmpltvisit_pivot_table,
+    cmpltvisit_pivot_dict=cmpltvisit_pivot_dict,
+    cncl_pivot_table=cncl_pivot_table,
+    cncl_pivot_dict=cncl_pivot_dict,
+    combined_plot_base64=combined_plot_base64,
+    cmplttask_pivot_table=cmplttask_pivot_table,
+    cmplttask_pivot_dict=cmplttask_pivot_dict,
+    category_task_map=category_task_map,
+    consentmovieC_pivot_table=consentmovieC_pivot_table,
+    consentmovieC_pivot_dict=consentmovieC_pivot_dict,
+    consenttimC_pivot_table=consenttimC_pivot_table,
+    consenttimC_pivot_dict=consenttimC_pivot_dict,
+    cmplttaskC_pivot_dict=cmplttaskC_pivot_dict,
+    cmplttaskC_pivot_table=cmplttaskC_pivot_table,
+    scan_brave_task_map=scan_brave_task_map,  
+    scan_brave_pivot_dict=scan_brave_pivot_dict,
+    scan_brave_pivot_table=scan_brave_pivot_table,
+    cmpltvisitC_pivot_table=cmpltvisitC_pivot_table,
+    cmpltvisitC_pivot_dict=cmpltvisitC_pivot_dict,
+    scan_brave_pivot_dictC=scan_brave_pivot_dictC,
+    scan_brave_pivot_tableC=scan_brave_pivot_tableC,
+    eyetracking_pivot_dictC=eyetracking_pivot_dictC,
+    eyetracking_pivot_tableC=eyetracking_pivot_tableC,
+    active_counts=active_counts,
+    merged_counts_dict=merged_counts_dict,
+)
+
+
+# Save the HTML report to a file
+html_report_path = '/Users/khosravip2/Downloads/weekly_report.html'
+with open(html_report_path, 'w') as file:
+    file.write(html_report)
